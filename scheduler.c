@@ -7,10 +7,11 @@
 #include <curses.h>
 #include <ucontext.h>
 #include <stdio.h>
-
+#include <time.h>
+#include <sys/time.h>
 #include "util.h"
 
-#define ERR -1
+//#define ERR -1
 // This is an upper limit on the number of tasks we can create.
 #define MAX_TASKS 128
 
@@ -41,7 +42,7 @@ typedef struct task_info {
   int state;
   struct timeval wakeup_time;
   task_t task_wait_for;
-  char input;
+  int input;
 
 } task_info_t;
 
@@ -61,11 +62,11 @@ void scheduler_init() {
   getcontext(&tasks[0].exit_context);
   tasks[0].exit_context.uc_stack.ss_sp = malloc(STACK_SIZE);
   tasks[0].exit_context.uc_stack.ss_size = STACK_SIZE;
-  makecontext(&tasks[0].exit_context, task_exit, 0);
+  //makecontext(&tasks[0].exit_context, task_exit, 0);
   getcontext(&tasks[0].context);
   tasks[0].context.uc_stack.ss_sp = malloc(STACK_SIZE);
   tasks[0].context.uc_stack.ss_size = STACK_SIZE;
-  tasks[0].context.uc_link = &tasks[index].exit_context;
+  //tasks[0].context.uc_link = &tasks[0].exit_context;
 
   tasks[0].state=RUNNING;
   tasks[0].task_wait_for=-1;
@@ -77,12 +78,12 @@ void scheduler_init() {
 }
 
 int next_context(int current){
-  int next=0;
+  int next=current;
   while(true){
-    next=(current+1)%num_tasks;
+    next=(next+1)%num_tasks;
     if(tasks[next].state==WAIT){
       if(tasks[tasks[next].task_wait_for].state==EXIT){
-        tasks[next].state==READY;
+        tasks[next].state=READY;
         tasks[next].task_wait_for=-1;
         return next;
       }
@@ -94,14 +95,14 @@ int next_context(int current){
         exit(2);
       }
       if((now.tv_sec*1000 + now.tv_usec/1000)>(tasks[next].wakeup_time.tv_sec*1000 + tasks[next].wakeup_time.tv_usec/1000)){
-        tasks[next].state==READY;
+        tasks[next].state=READY;
         return next;
       }
     }
     else if(tasks[next].state==INPUT){
-      char input=getchar();
-      if(input!==ERR){
-        tasks[next].state==READY;
+      int input=getch();
+      if(input!=ERR){
+        tasks[next].state=READY;
         tasks[next].input=input;
         return next;
       }
@@ -211,7 +212,7 @@ void task_sleep(size_t ms) {
   // Hint: Record the time the task should wake up instead of the time left for it to sleep. The bookkeeping is easier this way.
   struct timeval now;
   gettimeofday(&now,NULL);
-  now.tv_usec=now.tv_usec+ms;
+  now.tv_usec=now.tv_usec+ms*1000;
   tasks[current_task].state=SLEEP;
   tasks[current_task].wakeup_time=now;
 
@@ -233,8 +234,8 @@ int task_readchar() {
   // TODO: Block this task until there is input available.
   // To check for input, call getch(). If it returns ERR, no input was available.
   // Otherwise, getch() will returns the character code that was read.
-  char input=getchar();
-  if(input!==ERR){
+  int input=getch();
+  if(input!=ERR){
     return input;
   }
   tasks[current_task].state=INPUT;
@@ -242,5 +243,6 @@ int task_readchar() {
   current_task=next_context(current_task);
   tasks[current_task].state=RUNNING;
   swapcontext(&tasks[prev].context,&tasks[current_task].context);
+  //printw("%d",tasks[current_task].input);
   return tasks[current_task].input;
 }
