@@ -1,8 +1,8 @@
 CC := gcc
-CFLAGS := -g -Wall 
-
-clean:
-	rm -rf diningOut
+CFLAGS := -Wall 
 
 diningOut: diningOut.c
 	$(CC) $(CFLAGS) diningOut.c -o diningOut -lpthread
+
+clean:
+	rm -rf diningOut
