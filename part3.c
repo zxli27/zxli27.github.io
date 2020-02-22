@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 //Phil *phils;
 sem_t *mutexs;
@@ -25,20 +26,21 @@ void *process(void *arg){
 		smaller=right;
 		larger=left;
 	}
-	while(true){
+	while(1){
 		sem_wait(&mutexs[smaller]);
 		sem_wait(&mutexs[larger]);
 		printf("philosoper %d is eating with fork %d and fork %d\n",pnum,left,right);
 		sleep(3);
+		printf("philosopher %d is thinking\n",pnum);
 		sem_post(&mutexs[larger]);
 		sem_post(&mutexs[smaller]);
-		printf("philosopher %d is thinking\n",pnum);
+		sleep(3);
 	}	
 	pthread_exit(0);
 }
 
-vint main(int argc,char *argv[]){
-	number=*argv[1];
+int main(int argc,char *argv[]){
+	number=atoi(argv[1]);
 	mutexs=(sem_t *)malloc(sizeof(sem_t)*number);
 	//phils=(Phil *)malloc(sizeof(Phil)*number);
 	for(int i=0;i<number;i++){
@@ -47,13 +49,13 @@ vint main(int argc,char *argv[]){
 		//phils[i].other=-1;
 	}
 	pthread_t tid[number];
-	pthread_attr_t attr[number];
+	
 	int arg[number];
 	for(int i=0;i<number;i++){
 		tid[i]=i;
-		pthread_attr_init(&attr[i]);
+	
 		arg[i]=i;
-		pthread_create(&tid[i],&attr[i],&process,&arg[i]);
+		pthread_create(&tid[i],NULL,&process,&arg[i]);
 	}
 	for(int i=0;i<number;i++){
 		pthread_join(tid[i],NULL);
@@ -61,6 +63,7 @@ vint main(int argc,char *argv[]){
 	for(int i=0;i<number;i++){
 		sem_destroy(&mutexs[i]);
 	}
+	free(mutexs);
 	//free(phils);
 
 }
