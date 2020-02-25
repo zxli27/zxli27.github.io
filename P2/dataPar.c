@@ -74,7 +74,7 @@ int main(int argc,char *argv[]){
 		int arg[2][2];
 		arg[0][0]=365;
 		arg[0][1]=729;
-		arg[1][0]=3651;
+		arg[1][0]=0;
 		arg[1][1]=3651;
 		pthread_create(&tid[0],NULL,&findLine,arg[0]);
 		pthread_create(&tid[1],NULL,&findLine,arg[1]);
