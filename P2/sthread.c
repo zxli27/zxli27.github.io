@@ -9,11 +9,11 @@
 
 float *data;
 
-void *findLine(void *len){
+void findLine(void *len){
 	int *interval=(int *)len;
 	int start=interval[0],end=interval[1];
-	float intercept,slope,dif,intercept_final=0,slope_final=0;
-	float SAR=0, SAR_final=(float)INT_MAX;
+	double intercept,slope,dif,intercept_final=0,slope_final=0;
+	double SAR=0, SAR_final=(double)INT_MAX;
 	for(int i=start;i<end;i++){
 		for(int j=i+1;j<=end;j++){
 			slope=(data[j]-data[i])/(j-i);
@@ -34,8 +34,7 @@ void *findLine(void *len){
 			SAR=0;
 		}
 	}
-	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4f, %.2lf and  %.4f\n",end-start+1,intercept_final,slope_final,SAR_final);
-	pthread_exit(0);
+	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4lf, %.4lf and  %.4lf\n",end-start+1,intercept_final,slope_final,SAR_final);
 }
 
 int main(int argc,char *argv[]){
@@ -47,19 +46,14 @@ int main(int argc,char *argv[]){
 		for(int i=0;i<18;i++){
 			data[i]=d[i];
 		}
-		pthread_t tid[4];
-
 		int arg[4][2];
 		for(int i=0;i<4;i++){
-			tid[i]=i;
+		
 			arg[i][0]=0;
 			arg[i][1]=5+4*i;
-			pthread_create(&tid[i],NULL,&findLine,arg[i]);
+			findLine(arg[i]);
 		}
-		pthread_join(tid[0],NULL);
-		pthread_join(tid[1],NULL);
-		pthread_join(tid[2],NULL);
-		pthread_join(tid[3],NULL);
+		
 	}
 	else{
 		data=(float *)malloc(sizeof(float)*3652);
@@ -78,17 +72,16 @@ int main(int argc,char *argv[]){
 			strtok(tok,",");
 			data[i++]=atoi(strtok(NULL,","));
 		}
-		pthread_t tid[2]={0,1};
+		
 
 		int arg[2][2];
 		arg[0][0]=365;
 		arg[0][1]=729;
 		arg[1][0]=0;
 		arg[1][1]=3651;
-		pthread_create(&tid[0],NULL,&findLine,arg[0]);
-		pthread_create(&tid[1],NULL,&findLine,arg[1]);
-		pthread_join(tid[0],NULL);
-		pthread_join(tid[1],NULL);
+		findLine(arg[0]);
+		findLine(arg[1]);
+	
 		fclose(stream);
 	}
 	free(data);
