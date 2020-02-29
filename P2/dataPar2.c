@@ -17,12 +17,11 @@ int end;
 void *seg_SAR(void *args){
 	double *arg=(double *)args;	
 	int id=(int)*arg;
-	int seg_start=start+id*10;
-	int interval=99;
-	if(end-seg_start<99){
-		interval=end-seg_start;
+	int seg_start=start+id*(end-start+1)/4;
+	int seg_end=seg_start+(end-start+1)/4-1;
+	if(id==3){
+		seg_end=end;
 	}
-	int seg_end=seg_start+interval;
 	double SAR=0,dif=0;
 	for(int k=seg_start;k<=seg_end;k++){
 		dif=data[k]-slope*(k+1)-intercept;
@@ -43,7 +42,7 @@ void findLine(){
 		for(int j=i+1;j<=end;j++){
 			slope=(data[j]-data[i])/(j-i);
 			intercept=data[j]-slope*(j+1);
-			int numOfThread=(end-start+1)/100+1;
+			int numOfThread=4;
 		
 			pthread_t tid[numOfThread];
 			double arg[numOfThread];
