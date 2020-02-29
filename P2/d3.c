@@ -9,9 +9,9 @@
 float *data;
 int start;
 int end;
-double slope[4];
-double intercept[4];
-double SAR[4];
+double fslope[10];
+double fintercept[10];
+double fSAR[10];
 
 void *findLine1(void *len){
 	int *interval=(int *)len;
@@ -38,17 +38,18 @@ void *findLine1(void *len){
 			SAR=0;
 		}
 	}
-	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4lf, %.2f and  %.4f\n",end-start+1,intercept_final,slope_final,SAR_final);
+
+	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4lf, %.4lf and  %.4f\n",end-start+1,intercept_final,slope_final,SAR_final);
 	pthread_exit(0);
 }
 
 void *seg_SAR(void *arg){
 	int id=*((int *)arg);
-	double intercept,slope,dif,intercept_final=0,slope_final=0;
+	double dif,slope,intercept,intercept_final=0,slope_final=0;
 	double SAR=0, SAR_final=(double)INT_MAX;
-	int seg_start=start+id*(end-start+1)/4;
-	int seg_end=seg_start+(end-start+1)/4-1;
-	if(id==3){
+	int seg_start=start+id*(end-start+1)/10;
+	int seg_end=seg_start+(end-start+1)/10-1;
+	if(id==9){
 		seg_end=end;
 	}
 	for(int i=seg_start;i<=seg_end;i++){
@@ -71,36 +72,36 @@ void *seg_SAR(void *arg){
 			SAR=0;
 		}
 	}
-	slope[id]=slope_final;
-	intercept[id]=intercept_final;
-	SAR[id]=SAR_final;
-	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4lf, %.4lf and  %.4lf\n",end-start+1,intercept_final,slope_final,SAR_final);
+	fslope[id]=slope_final;
+	fintercept[id]=intercept_final;
+	fSAR[id]=SAR_final;
+	
 	pthread_exit(0);
 }
 
 void findLine2(){
 	double intercept_final=0,slope_final=0;
-	double SAR=0, SAR_final=(double)INT_MAX;
+	double SAR_final=(double)INT_MAX;
 		
-	pthread_t tid[4];
-	double arg[4];
-	for(int i=0;i<4;i++){
+	pthread_t tid[10];
+	int arg[10];
+	for(int i=0;i<10;i++){
 		tid[i]=i;
 		arg[i]=i;	
 		pthread_create(&tid[i],NULL,&seg_SAR,&arg[i]);
 	}
-	for(int i=0;i<4;i++){
+	for(int i=0;i<10;i++){
 		pthread_join(tid[i],NULL);
 	}
-	for(int i=0;i<4;i++){
-		if(SAR[i]<SAR_final){
-			intercept_final=intercept[i];
-			slope_final=slope[i];
-			SAR_final=SAR[i];
+	for(int i=0;i<10;i++){
+		if(fSAR[i]<SAR_final){
+			intercept_final=fintercept[i];
+			slope_final=fslope[i];
+			SAR_final=fSAR[i];
 		}
 	}
 	
-	SAR=0;
+	
 		
 	
 	printf("The intercept, slope and SAR of the best L1 line of %d data sets are respectively %.4lf, %.4lf and  %.4f\n",end-start+1,intercept_final,slope_final,SAR_final);
@@ -108,6 +109,8 @@ void findLine2(){
 }
 
 int main(int argc,char *argv[]){
+	struct timeval s;
+	gettimeofday(&s,NULL);
 	if(argc<=1){
 		data=(float *)malloc(sizeof(float)*18);
 		float d[18]={87.6,88.9,90.4,91.3,92.9,95.4,97.8,100,102.8,104.7,107,109.1,111.5,114.1,114.4,116.5,119.9,121.7};
@@ -146,9 +149,12 @@ int main(int argc,char *argv[]){
 		findLine2();
 		start=0;
 		end=3651;
-		findLine();
-		fclose2(stream);
+		findLine2();
+		fclose(stream);
 	}
+	struct timeval e;
+	gettimeofday(&e,NULL);
+	printf("the runtime is %li\n",(e.tv_sec-s.tv_sec)*1000000+e.tv_usec-s.tv_usec);
 	free(data);
 	exit(1);
 }
