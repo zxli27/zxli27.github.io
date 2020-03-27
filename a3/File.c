@@ -40,10 +40,11 @@ void initDisk(){
 	free(init);
 	fclose(fp);
 //format
+	memset(buffer,0,512);
 	fp=fopen(fileAddr,"r+");
 	//superblock
-	int magicnum=42;              //???????????????
-	memcpy(buffer,&magicnum,4);
+	int magicnum=42;              
+	memcpy(buffer,&magicnum,4);    //????????????????????????
 	memcpy(&buffer[4],&NUM_BLOCKS,4);
 	memcpy(&buffer[8],&BLOCK_SIZE,4);
 
@@ -52,7 +53,7 @@ void initDisk(){
 	//block1: free block vector
 	memset(buffer,255,512);   //make every bit 1
 	buffer[0]=0;
-	buffer[1]=63;
+	buffer[1]=31;
 	writeBlock(fp,1,buffer);
 	//block2: free inode vector
 	memset(buffer,255,14);   
@@ -71,27 +72,30 @@ void initDisk(){
 	memset(buffer,0,512);
 	inodeIntoArray(root,buffer);
 	writeBlock(fp,3,buffer);
+	fclose(fp);
 }
 
 int findInode(char *addr){
+	if(strcmp(addr,"/")==0){
+		return 0;
+	}
 	char buffer[512];
 	FILE *fp=fopen(fileAddr,"r+");
 	char *token=strtok(addr,"/");
 	char fname[32]="";
-	int parentblock=3;
-	int blocknum=3;
+	int inumber=0;
 	int inode=0;
 	int flag=1;
 	while(token!=NULL){
-		readBlock(fp,blocknum,buffer);
+		readBlock(fp,3+inode/16,buffer);
 		short num=1;
 		char buffer2[512];
 		for(int i=0;i<10 && num!=0;i++){
-			num=(buffer[inode%16*32+8+2*i]-'0')*256+(buffer[inode%16*32+9+2*i]-'0'); //??????????????????????
+			num=buffer[inode%16*32+8+2*i]+buffer[inode%16*32+9+2*i]*256; //??????????????????????
 			readBlock(fp,(int)num,buffer2);
 			for(int j=0;j<16;j++){
-				char inumber=buffer2[j*32];
-			
+				inumber=buffer2[j*32];
+				if(inumber==0){continue;}
 				for(int k=1;k<32 ;k++){
 					fname[k-1]=buffer2[j*32+k];
 					if(fname[k-1]=='\0'){
@@ -100,24 +104,25 @@ int findInode(char *addr){
 				}
 				if(strcmp(fname,token)==0){
 					inode=inumber;
-					parentblock=blocknum;
-					blocknum=inumber;
 					flag=0;
 					break;
 				}
 
 			}
 			if(flag==0){
-				flag=1;
 				break;
 			}
 		}
-		if(blocknum==parentblock){
+		if(flag==1){
+			fprintf(stderr,"The address is not correct.\n");
+			fclose(fp);
 			return -1;
 		}
+		flag=1;
 		token=strtok(NULL,"/");
 	}
-	return blocknum;
+	fclose(fp);
+	return inode;
 }
 
 int findFreeInode(){
@@ -128,11 +133,13 @@ int findFreeInode(){
 		char c=0b10000000;
 		for(int j=0;j<8;j++){
 			if((c&buffer[i])!=0){
+				fclose(fp);
 				return i*8+j;
 			}
 			c=c>>1;
 		}
 	}
+	fclose(fp);
 	return -1;
 }
 
@@ -144,11 +151,13 @@ int findFreeBlock(){
 		char c=0b10000000;
 		for(int j=0;j<8;j++){
 			if((c&buffer[i])!=0){
+				fclose(fp);
 				return i*8+j;
 			}
 			c=c>>1;
 		}
 	}
+	fclose(fp);
 	return -1;
 }
 
@@ -159,11 +168,13 @@ int createFile(char *addr,int type){
 	int inum=findFreeInode(fp);
 	if(inum==-1){
 		fprintf(stderr,"there is no avaliable inode for a new file.\n");
+		fclose(fp);
 		return -1;
 	}
 	int blocknum=findFreeBlock(fp);
 	if(blocknum==-1){
 		fprintf(stderr,"there is no avaliable block for a new file.\n");
+		fclose(fp);
 		return -1;
 	}
 	//find the path
@@ -171,14 +182,22 @@ int createFile(char *addr,int type){
 	while(addr[i]!='/'){
 		i--;
 	}
-	char path[i+1];
-	strncpy(path,addr,i);
-	path[i]='\0';
-	int dirInode=findInode(path);
+	int dirInode;
+	if(i==0){
+		dirInode=0;
+	}
+	else{
+		char path[i+1];
+		strncpy(path,addr,i);
+		path[i]='\0';
+		dirInode=findInode(path);
+	}
 	if(dirInode==-1){
 		fprintf(stderr,"The path doesn't exist.\n");
+		fclose(fp);
 		return -1;
 	}
+	
 	//update the free inode/block vector block
 	readBlock(fp,1,buffer);
 	buffer[blocknum/8]=buffer[blocknum/8]-(0b10000000>>(blocknum%8));
@@ -187,15 +206,16 @@ int createFile(char *addr,int type){
 	readBlock(fp,2,buffer);
 	buffer[inum/8]=buffer[inum/8]-(0b10000000>>(inum%8));
 	writeBlock(fp,2,buffer);
+	
 	//add an entry to the directory
 	readBlock(fp,3+dirInode/16,buffer);
-	int size=(((int)buffer[dirInode%16*32])<<24)+(((int)buffer[dirInode%16*32+1])<<16)+(((int)buffer[dirInode%16*32+2])<<8)+((int)buffer[dirInode%16*32+3]);
+	int size=((int)buffer[dirInode%16*32])+(((int)buffer[dirInode%16*32+1])<<8)+(((int)buffer[dirInode%16*32+2])<<16)+(((int)buffer[dirInode%16*32+3])<<24);
 	size+=32;
 	memcpy(&buffer[dirInode%16*32],&size,4);
-	size-=32;
+	writeBlock(fp,3+dirInode/16,buffer);
 	//what if the block is full??????????????
 	//???????????????????????????????????
-	int targetBlock=((int)(buffer[dirInode%16*32+8+size/256])<<8)+(int)(buffer[dirInode%16*32+8+size/256+1]);
+	int targetBlock=(int)(buffer[dirInode%16*32+8+(size-32)/256])+(int)(buffer[dirInode%16*32+8+(size-32)/256+1])*256;
 	readBlock(fp,targetBlock,buffer);
 	char entry[strlen(addr)-i+1];
 	entry[0]=inum;
@@ -204,7 +224,7 @@ int createFile(char *addr,int type){
 
 	memcpy(&buffer[size%512],entry,strlen(addr)-i+1);
 	writeBlock(fp,targetBlock,buffer);
-
+	
 	//create a inode struct and put it into the block
 	inode newfile;
 	newfile.fsize=0;
@@ -218,6 +238,7 @@ int createFile(char *addr,int type){
 	readBlock(fp,3+inum/16,buffer);
 	inodeIntoArray(newfile,&buffer[inum%16*32]);
 	writeBlock(fp,3+inum/16,buffer);
+	fclose(fp);
 	return 0;
 }
 
@@ -227,65 +248,75 @@ int deleteFile(char *addr){
 	//get the block numbers of the file
 	int inodeNum=findInode(addr);
 	if(inodeNum==-1){
+		fclose(fp);
 		return -1;
 	}
 	readBlock(fp,3+inodeNum/16,buffer);
 	//check if it is a directory
-	if(buffer[inodeNum%16*32+7]==1){
+	if(buffer[inodeNum%16*32+4]==1){
 		for(int i=0;i<4;i++){
 			if(buffer[inodeNum%16*32+i]!=0){
 				fprintf(stderr,"the directory is not empty.\n");
+				fclose(fp);
 				return -1;
 			}
 		}
 	}
 	int blocks[10];
 	for(int i=0;i<10;i++){
-		blocks[i]=buffer[inodeNum%16*32+8+2*i]*256+buffer[inodeNum%16*32+9+2*i];
+		blocks[i]=buffer[inodeNum%16*32+9+2*i]*256+buffer[inodeNum%16*32+8+2*i];
 	}
 	//free the inode and the blocks
 	readBlock(fp,1,buffer);
 	int i=0;
 	while(blocks[i]!=0){
 		buffer[blocks[i]/8]=buffer[blocks[i]/8]|(0b10000000>>(blocks[i]%8));
+		i++;
 	}
 	writeBlock(fp,1,buffer);
 	readBlock(fp,2,buffer);
 	buffer[inodeNum/8]=buffer[inodeNum/8]|(0b10000000>>(inodeNum%8));
 	writeBlock(fp,2,buffer);
+	
 	//remove the entry from the directory
 	i=strlen(addr)-1;
 	while(addr[i]!='/'){
 		i--;
 	}
-	char path[i+1];
-	strncpy(path,addr,i);
-	path[i]='\0';
-	int dirInode=findInode(path);
+	int dirInode=0;
+	if(i!=0){
+		char path[i+1];
+		strncpy(path,addr,i);
+		path[i]='\0';
+		dirInode=findInode(path);
+	}
 	if(dirInode==-1){
 		fprintf(stderr,"The path doesn't exist.\n");
+		fclose(fp);
 		return -1;
 	}
 	readBlock(fp,3+dirInode/16,buffer);
-	int size=((int)(buffer[dirInode%16*32])<<24)+((int)(buffer[dirInode%16*32+1])<<16)+((int)(buffer[dirInode%16*32+2])<<8)+(int)(buffer[dirInode%16*32+3]);
+	int size=((int)(buffer[dirInode%16*32+3])<<24)+((int)(buffer[dirInode%16*32+2])<<16)+((int)(buffer[dirInode%16*32+1])<<8)+(int)(buffer[dirInode%16*32]);
 	size-=32;
 	memcpy(&buffer[dirInode%16*32],&size,4);
 	writeBlock(fp,3+dirInode/16,buffer);
 	short num=1;
 	char buffer2[512];
 	for(int i=0;i<10 && num!=0;i++){
-		num=buffer[dirInode%16*32+8+2*i]*256+buffer[dirInode%16*32+9+2*i];
+		num=buffer[dirInode%16*32+9+2*i]*256+buffer[dirInode%16*32+8+2*i];
 		readBlock(fp,num,buffer2);
 		for(int j=0;j<16;j++){
 			char inumber=buffer2[j*32];
 			if(inumber==inodeNum){
 				memset(&buffer2[j*32],0,32);
 				writeBlock(fp,(int)num,buffer2);
+				fclose(fp);
 				return 1;
 			}
 
 		}
 	}
+	fclose(fp);
 	return 0;
 }
 
@@ -363,8 +394,11 @@ int writeFile(char *addr,char *content){
 	return 0;
 
 }
-
-	int main(){
+int main(){
+	initDisk();
+	createFile("/helloworld",0);
+	printf("%d \n",findInode("/helloworld"));
+	deleteFile("/helloworld");
 	return 0;
 }
 
