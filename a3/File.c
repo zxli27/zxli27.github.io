@@ -81,12 +81,17 @@ int findInode(char *addr){
 	}
 	char buffer[512];
 	FILE *fp=fopen(fileAddr,"r+");	
-	char *token=strtok(addr,"/");	
+	int len=strlen(addr);
+	char ad[len+1];
+	ad[len]='\0';
+	memcpy(ad,addr,len);
+	char *token=strtok(ad,"/");	
 	char fname[32]="";
 	int inumber=0;
 	int inode=0;
 	int flag=1;
-	while(token!=NULL){
+	
+        while(token!=NULL){
 		readBlock(fp,3+inode/16,buffer);
 		short num=1;
 		char buffer2[512];
@@ -342,12 +347,16 @@ int readFile(char *addr){
 		return -1;
 	}
 	readBlock(fp,3+inum/16,buffer);
+	int size=((int)(buffer[inum%16*32+3])<<24)+((int)(buffer[inum%16*32+2])<<16)+((int)(buffer[inum%16*32+1])<<8)+(int)(buffer[inum%16*32]);
 	int num=1;
 	char buffer2[513];
-	buffer2[512]='\0';
-	for(int i=0;i<10 && num!=0;i++){
+	for(int i=0;i<=size/512;i++){
 		num=buffer[inum%16*32+9+2*i]*256+buffer[inum%16*32+8+2*i];
 		readBlock(fp,num,buffer2);
+		if(i==size/512){
+			buffer2[size-i*512]='\0';
+		}
+		else{buffer2[512]='\0';}
 		printf("%s",buffer2);
 	}
 	printf("\n");
@@ -418,13 +427,13 @@ int writeFile(char *addr,char *content){
 }
 int main(){
 	initDisk();
-	createFile("/helloworld",0);
-	writeFile("/helloworld","Hello, World!");
-	char str[514];
-	for(int i=0;i<513;i++){str[i]='q';}
-	str[513]='\0';
-	writeFile("/helloworld",str);
-	readFile("/helloworld");
+	createFile("/dir1",1);
+	createFile("/dir1/dir2",1);
+	createFile("dir1/dir2/file1",0);
+	createFile("/dir1/file2",0);
+	printf("%d\n",findInode("/dir1/dir2/file1"));
+	writeFile("/dir1/file2","hhhhhhhhhhhhhhhhhhhheeeeeeeeeeeeeeeeeeeeeeelllllllllllllllllllllllllllllllllllllllllllllllllooooooooooooooooooooooooo");
+	readFile("/dir1/file2");
 	return 0;
-}
+	}
 
