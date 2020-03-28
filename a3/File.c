@@ -86,7 +86,7 @@ int findInode(char *addr){
 	int inumber=0;
 	int inode=0;
 	int flag=1;
-	/*while(token!=NULL){
+	while(token!=NULL){
 		readBlock(fp,3+inode/16,buffer);
 		short num=1;
 		char buffer2[512];
@@ -124,7 +124,7 @@ int findInode(char *addr){
 		token=strtok(NULL,"/");
 	}
 	fclose(fp);
-	return inode;*/
+	return inode;
 	return 0;
 }
 
@@ -338,6 +338,7 @@ int readFile(char *addr){
 	int inum=findInode(addr);
 	if(inum==-1){
 		fprintf(stderr,"The file doesn't exist.\n");
+		fclose(fp);
 		return -1;
 	}
 	readBlock(fp,3+inum/16,buffer);
@@ -345,10 +346,12 @@ int readFile(char *addr){
 	char buffer2[513];
 	buffer2[512]='\0';
 	for(int i=0;i<10 && num!=0;i++){
-		num=buffer[inum%16*32+8+2*i]*256+buffer[inum%16*32+9+2*i];
+		num=buffer[inum%16*32+9+2*i]*256+buffer[inum%16*32+8+2*i];
 		readBlock(fp,num,buffer2);
 		printf("%s",buffer2);
 	}
+	printf("\n");
+	fclose(fp);
 	return 0;
 }
 
@@ -358,15 +361,21 @@ int writeFile(char *addr,char *content){
 	int inum=findInode(addr);
 	if(inum==-1){
 		fprintf(stderr,"The file doesn't exist.\n");
+		fclose(fp);
 		return -1;
 	}
 	readBlock(fp,3+inum/16,buffer);
-	int size=((int)(buffer[inum%16*32])<<24)+((int)(buffer[inum%16*32+1])<<16)+((int)(buffer[inum%16*32+2])<<8)+(int)(buffer[inum%16*32+3]);
-	int num=buffer[inum%16*32+8+size/512*2]*256+buffer[inum%16*32+9+size/512*2];
+	int size=((int)(buffer[inum%16*32+3])<<24)+((int)(buffer[inum%16*32+2])<<16)+((int)(buffer[inum%16*32+1])<<8)+(int)(buffer[inum%16*32]);
+	int num=buffer[inum%16*32+9+size/512*2]*256+buffer[inum%16*32+8+size/512*2];
 	
 	char buffer2[512];
 	readBlock(fp,num,buffer2);
 	int contentlen=strlen(content);
+	if(contentlen+size>10*512){
+		fprintf(stderr,"The content exceeds the volume of the file\n");
+		fclose(fp);
+		return -1;
+	}
 	//first segment
 	int seg1=512-size%512;
 	int segnum=0;
@@ -378,7 +387,7 @@ int writeFile(char *addr,char *content){
 		float a=(float)(contentlen-(512-size%512));
 		segnum=ceil(a/512)+1;
 	}
-	memcpy(&buffer2[size%512],&content,seg1);
+	memcpy(&buffer2[size%512],content,seg1);
 	writeBlock(fp,num,buffer2);
 	//other segments
 	short blocknum[segnum];
@@ -403,16 +412,19 @@ int writeFile(char *addr,char *content){
 		buffer[blocknum[i]/8]=buffer[blocknum[i]/8]-(0b10000000>>(blocknum[i]%8));
 	}
 	writeBlock(fp,1,buffer);
+	fclose(fp);
 	return 0;
 
 }
 int main(){
-	//initDisk();
-	//createFile("/helloworld",0);
-	//deleteFile("/helloworld");
-	//createFile("/dir1",1);
-	//createFile("/dir1/dir2",1);
-	printf("%d \n",findInode("/dir1/dir2"));
+	initDisk();
+	createFile("/helloworld",0);
+	writeFile("/helloworld","Hello, World!");
+	char str[514];
+	for(int i=0;i<513;i++){str[i]='q';}
+	str[513]='\0';
+	writeFile("/helloworld",str);
+	readFile("/helloworld");
 	return 0;
 }
 
