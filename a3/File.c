@@ -80,13 +80,13 @@ int findInode(char *addr){
 		return 0;
 	}
 	char buffer[512];
-	FILE *fp=fopen(fileAddr,"r+");
-	char *token=strtok(addr,"/");
+	FILE *fp=fopen(fileAddr,"r+");	
+	char *token=strtok(addr,"/");	
 	char fname[32]="";
 	int inumber=0;
 	int inode=0;
 	int flag=1;
-	while(token!=NULL){
+	/*while(token!=NULL){
 		readBlock(fp,3+inode/16,buffer);
 		short num=1;
 		char buffer2[512];
@@ -102,12 +102,14 @@ int findInode(char *addr){
 						break;
 					}
 				}
-				if(strcmp(fname,token)==0){
+				
+				if(strncmp(fname,token,strlen(token))==0){
+				
 					inode=inumber;
 					flag=0;
 					break;
 				}
-
+				inode=inumber;
 			}
 			if(flag==0){
 				break;
@@ -122,7 +124,8 @@ int findInode(char *addr){
 		token=strtok(NULL,"/");
 	}
 	fclose(fp);
-	return inode;
+	return inode;*/
+	return 0;
 }
 
 int findFreeInode(){
@@ -215,16 +218,25 @@ int createFile(char *addr,int type){
 	writeBlock(fp,3+dirInode/16,buffer);
 	//what if the block is full??????????????
 	//???????????????????????????????????
-	int targetBlock=(int)(buffer[dirInode%16*32+8+(size-32)/256])+(int)(buffer[dirInode%16*32+8+(size-32)/256+1])*256;
-	readBlock(fp,targetBlock,buffer);
 	char entry[strlen(addr)-i+1];
 	entry[0]=inum;
 	strncpy(&entry[1],&addr[i+1],strlen(addr)-i-1);
 	entry[strlen(addr)-i]='\0';
+	int flag=0;
+	for(int k=0;k<10;k++){
+		int targetBlock=(int)(buffer[dirInode%16*32+8+k*2])+(int)(buffer[dirInode%16*32+9+k*2])*256;
+		readBlock(fp,targetBlock,buffer);
+		for(int a=0;a<16;a++){
+			if(buffer[a*32]==0){
+				memcpy(&buffer[a*32],entry,strlen(addr)-i+1);
+				writeBlock(fp,targetBlock,buffer);
+				flag=1;
+				break;
+			}
+		}
+		if(flag==1){break;}
 
-	memcpy(&buffer[size%512],entry,strlen(addr)-i+1);
-	writeBlock(fp,targetBlock,buffer);
-	
+	}
 	//create a inode struct and put it into the block
 	inode newfile;
 	newfile.fsize=0;
@@ -395,10 +407,12 @@ int writeFile(char *addr,char *content){
 
 }
 int main(){
-	initDisk();
-	createFile("/helloworld",0);
-	printf("%d \n",findInode("/helloworld"));
-	deleteFile("/helloworld");
+	//initDisk();
+	//createFile("/helloworld",0);
+	//deleteFile("/helloworld");
+	//createFile("/dir1",1);
+	//createFile("/dir1/dir2",1);
+	printf("%d \n",findInode("/dir1/dir2"));
 	return 0;
 }
 
