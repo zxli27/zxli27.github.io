@@ -8,13 +8,13 @@ int findFreeInode();
 
 int findFreeBlock();
 
-void createFile();
+int createFile();
 
-void deleteFile();
+int deleteFile();
 
-void writeFile();
+int writeFile();
 
-void readFile();
+int readFile();
 
 
-bool checkIntegrity();
+// checkIntegrity();
