@@ -2,19 +2,14 @@
 
 void initDisk();
 
-int findInode();
+int findInode(char *addr);
 
-int findFreeInode();
+int createFile(char *addr,int type);
 
-int findFreeBlock();
+int deleteFile(char *addr);
 
-int createFile();
+int writeFile(char *addr,char *content);
+       
+int readFile(char *addr,int length,void *ptr);
 
-int deleteFile();
-
-int writeFile();
-
-int readFile();
-
-
-// checkIntegrity();
+int fsck();

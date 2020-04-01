@@ -9,7 +9,7 @@
 #define flat 0
 #define directory 1
 
-const char *fileAddr="vdisk";
+const char *fileAddr="../disk/vdisk";
 const int NUM_INODES=128;
 
 
@@ -95,7 +95,7 @@ int findInode(char *addr){
 	int inode=0;
 	int flag=1;
 	
-    while(token!=NULL){
+    	while(token!=NULL){
 		readBlock(fp,map[3*inode+1]+map[3*inode+2]*256,buffer);
 		short num=1;
 		char buffer2[512];
@@ -222,11 +222,11 @@ int createFile(char *addr,int type){
 	map[3*dirInode+1]=tail%256;
 	vector[pInodeBlock/8]=vector[pInodeBlock/8]|(0b10000000>>(pInodeBlock%8));
 	//add an entry to the directory
-	readBlock(fp,pInodeBlock,segment[0]);
-	int size=((int)segment[0][0])+(((int)segment[0][1])<<8)+(((int)segment[0][2])<<16)+(((int)segment[0][3])<<24);
+	readBlock(fp,pInodeBlock,segment[0]); 
+	int size=(((unsigned char)segment[0][3])<<24)+(((unsigned char)segment[0][2])<<16)+(((unsigned char)segment[0][1])<<8)+((unsigned char)segment[0][0]);
 	size+=32;
 	memcpy(&segment[0][0],&size,4);
-	
+
 	char entry[strlen(addr)-i+1];
 	entry[0]=inum;
 	strncpy(&entry[1],&addr[i+1],strlen(addr)-i-1);
@@ -238,6 +238,7 @@ int createFile(char *addr,int type){
 		if(targetBlock==0){
 			segment[0][8+k*2]=(tail+1)%256;
 			segment[0][9+k*2]=(tail+1)/256;
+			memset(segment[1],0,512);
 			memcpy(segment[1],entry,strlen(addr)-i+1);
 			break;
 		}
@@ -345,7 +346,7 @@ int deleteFile(char *addr){
 	int pInodeBlock=map[3*dirInode+1]+map[3*dirInode+2]*256;
 	vector[pInodeBlock/8]=vector[pInodeBlock/8]|(0b10000000>>(pInodeBlock%8));
 	readBlock(fp,pInodeBlock,segment[0]);
-	int size=((int)(segment[0][3])<<24)+((int)(segment[0][2])<<16)+((int)(segment[0][1])<<8)+(int)(segment[0][0]);
+	int size=(((unsigned char)segment[0][3])<<24)+(((unsigned char)segment[0][2])<<16)+(((unsigned char)segment[0][1])<<8)+((unsigned char)segment[0][0]);
 	size-=32;
 	memcpy(&segment[0][0],&size,4);
 	short num=1;
@@ -376,7 +377,7 @@ int deleteFile(char *addr){
 	return 0;
 }
 
-int readFile(char *addr){
+int readFile(char *addr,int length,void *ptr){
 	char buffer[512];
 	char map[512];
 	FILE *fp=fopen(fileAddr,"r+");
@@ -388,19 +389,21 @@ int readFile(char *addr){
 		return -1;
 	}
 	readBlock(fp,map[3*inum+1]+map[3*inum+2]*256,buffer);
-	int size=((int)(buffer[3])<<24)+((int)(buffer[2])<<16)+((int)(buffer[1])<<8)+(int)(buffer[0]);
+	int size=(((unsigned char)buffer[3])<<24)+(((unsigned char)buffer[2])<<16)+(((unsigned char)buffer[1])<<8)+((unsigned char)buffer[0]);
+	int len=length;
+	if(length>size){len=size;}
+	char content[len+1];
+	char buffer2[512];
 	int num=1;
-	char buffer2[513];
-	for(int i=0;i<=size/512;i++){
+	for(int i=0;i<=len/512;i++){
 		num=buffer[9+2*i]*256+buffer[8+2*i];
 		readBlock(fp,num,buffer2);
-		if(i==size/512){
-			buffer2[size-i*512]='\0';
-		}
-		else{buffer2[512]='\0';}
-		printf("%s",buffer2);
+		int seg=512;
+		if(i==len/512){seg=len-(len/512)*512;}
+		memcpy(&content[i*512],buffer2,seg);
 	}
-	printf("\n");
+	content[len]='\0';
+	memcpy(ptr,content,len+1);
 	fclose(fp);
 	return 0;
 }
@@ -425,7 +428,7 @@ int writeFile(char *addr,char *content){
 	map[3*inum+1]=tail%256;
 	map[3*inum+2]=tail/256;
 	readBlock(fp,inodeBlock,seg[0]);
-	int size=((int)(seg[0][3])<<24)+((int)(seg[0][2])<<16)+((int)(seg[0][1])<<8)+(int)(seg[0][0]);
+	int size=((int)((unsigned char)seg[0][3])<<24)+((int)((unsigned char)seg[0][2])<<16)+((int)((unsigned char)seg[0][1])<<8)+(int)((unsigned char)seg[0][0]);
 	int num=seg[0][9+size/512*2]*256+seg[0][8+size/512*2];
 	if(num!=0){
 		vector[num/8]=vector[num/8]|(0b10000000>>(num%8));
@@ -486,19 +489,23 @@ int writeFile(char *addr,char *content){
 	return 0;
 
 }
+
+int fsck(){
+	return 0;
+}
 /*
 int main(){
 	initDisk();
-	createFile("/dir1",1);
-	createFile("/file3",0);
-	createFile("dir1/dir2",0);
-	createFile("dir1/dir2/file1",0);
-	createFile("/dir1/file2",0);
-	deleteFile("dir1/dir2/file1");
-	printf("%d\n",findInode("/dir1/dir2/file1"));
-	char b[531];
-	for(int i=0;i<530;i++){b[i]='w';}
-	b[530]='\0';
-	writeFile("/dir1/file2",b);
+	//createFile("/dir1",1);
+	//createFile("/file3",0);
+	//createFile("dir1/dir2",0);
+	//createFile("dir1/dir2/file1",0);
+	//createFile("/dir1/file2",0);
+	//deleteFile("dir1/dir2/file1");
+	//printf("%d\n",findInode("/dir1/dir2/file1"));
+	//char b[531];
+	//for(int i=0;i<530;i++){b[i]='w';}
+	//b[530]='\0';
+	//writeFile("/dir1/file2",b);
 	return 0;
 }*/
