@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-#include "driver.h"
+#include "../disk/driver.h"
 #include "File.h"
 
 #define flat 0
@@ -486,6 +486,7 @@ int writeFile(char *addr,char *content){
 	return 0;
 
 }
+/*
 int main(){
 	initDisk();
 	createFile("/dir1",1);
@@ -500,4 +501,4 @@ int main(){
 	b[530]='\0';
 	writeFile("/dir1/file2",b);
 	return 0;
-	}
+}*/
