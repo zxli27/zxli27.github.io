@@ -267,11 +267,11 @@ int createFile(char *addr,int type){
 	newfile.dib=0;
 	inodeIntoArray(newfile,segment[2]);
 	//push segment to the tail of the log and update inode map and block vector
-	writeBlock(fp,1,vector);
-	writeBlock(fp,2,map);
 	for(int i=0;i<3;i++){
 		writeBlock(fp,tail+i,segment[i]);
 	}
+	writeBlock(fp,2,map);
+	writeBlock(fp,1,vector);
 
 
 	fclose(fp);
@@ -362,11 +362,11 @@ int deleteFile(char *addr){
 				map[3*dirInode+1]=tail%256;
 				map[3*dirInode+2]=tail/256;
 				vector[num/8]=vector[num/8]|(0b10000000>>(num%8));
-				writeBlock(fp,1,vector);
-				writeBlock(fp,2,map);
 				for(int i=0;i<2;i++){
 					writeBlock(fp,tail+i,segment[i]);
 				}
+				writeBlock(fp,2,map);
+				writeBlock(fp,1,vector);
 				fclose(fp);
 				return 1;
 			}
@@ -491,6 +491,85 @@ int writeFile(char *addr,char *content){
 }
 
 int fsck(){
+	int ick[4096];
+	char vector[512];
+	char map[512];
+	char buffer[512];
+	FILE *fp=fopen(fileAddr,"r+");
+	readBlock(fp,1,vector);
+	readBlock(fp,2,map);
+	//inode check
+	for(int i=10;i<4096;i++){
+		ick[i]=0;
+		unsigned char h=0b10000000;
+		if((((unsigned char)vector[i/8])&(h>>(i%8)))!=0){ick[i]=1;}
+	}
+	int bnum=0;
+	for(int i=0;i<128;i++){
+		bnum=(unsigned char)map[i*3+1]+((unsigned char)map[i*3+2])*256;
+		if(bnum==0){continue;}
+		if(ick[bnum]==1){
+			vector[bnum/8]=vector[bnum/8]-(0b10000000>>(bnum%8));		
+		}
+		ick[bnum]=2;
+		readBlock(fp,bnum,buffer);
+		
+		int fblock=(unsigned char)buffer[8]+(unsigned char)buffer[9]*256;
+		int k=1;
+		while(k<10 && fblock!=0){
+			if(ick[fblock]==1){
+				vector[fblock/8]=vector[fblock/8]-(0b10000000>>(fblock%8));
+			}
+			if(ick[fblock]==2 || ick[fblock]==3){
+				fprintf(stderr,"Block %d belongs to more than one file.\n",fblock);
+				fclose(fp);
+				return -1;
+			}
+			ick[fblock]=3;
+			fblock=(unsigned char)buffer[8+2*k]+(unsigned char)buffer[9+2*k]*256;
+			k++;
+		}
+
+	}
+	for(int i=10;i<4096;i++){
+		if(ick[i]==0){
+			vector[i/8]=vector[i/8]|(0b10000000>>(i%8));
+		}
+	}
+	writeBlock(fp,1,vector);
+	//directory check
+	//-2 represents the file can't be reached
+	//-1 represents the file of the inode number doesn't exist
+	//other numbers represent the parent directory inode number of the file
+	int dck[128];
+	char buffer2[512];
+	for(int i=0;i<128;i++){dck[i]=-2;}
+	dck[0]=0;
+	for(int i=0;i<128;i++){
+		bnum=(unsigned char)map[i*3+1]+((unsigned char)map[i*3+2])*256;
+		if(bnum==0){dck[i]=-1;continue;}
+		readBlock(fp,bnum,buffer);
+		if(buffer[4]==0){continue;}
+		int fblock=(unsigned char)buffer[8]+(unsigned char)buffer[9]*256;
+		for(int a=0;a<10 && fblock!=0;a++){
+			readBlock(fp,fblock,buffer2);
+			for(int j=0;j<16;j++){
+				if(buffer2[j*32]!=0){
+					dck[(int)buffer2[j*32]]=i;
+				}
+			}
+			fblock=(unsigned char)buffer[8+2*a]+(unsigned char)buffer[9+2*a]*256;
+			
+		}
+	}
+	for(int i=0;i<128;i++){
+		if(dck[i]==-2){
+			fprintf(stderr,"the file with inode number %d is not reachable.\n",i);
+			fclose(fp);
+			return -1;
+		}
+	}
+	fclose(fp);
 	return 0;
 }
 /*

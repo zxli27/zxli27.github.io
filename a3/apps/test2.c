@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "../io/File.h"
+#include "../disk/driver.h"
 
 int main(){
 	printf("1. initialize and format the disk.\n");
@@ -25,10 +26,22 @@ int main(){
 	char ptr[501];
 	readFile("/dir00/file1",1000,ptr);
 	printf("%s\n",ptr);
-	printf("5 delete dir01.\n");
+	printf("5. delete dir01.\n");
 	deleteFile("/dir01");
-	printf("create dir17.\n");
+	printf("6. create dir17.\n");
 	createFile("/dir17",1);
 
 
+	printf("7. file system check: ");
+	char buffer[512];
+	FILE *fp=fopen("../disk/vdisk","r+");
+	readBlock(fp,1,buffer);
+	buffer[50]=0b11111110;
+	writeBlock(fp,1,buffer);
+	fclose(fp);
+	int k=fsck();
+	fp=fopen("../disk/vdisk","r+");
+	readBlock(fp,1,buffer);
+	if(k==0&&buffer[50]==-1){printf("check succeeds.\n");}
+	fclose(fp);
 }
